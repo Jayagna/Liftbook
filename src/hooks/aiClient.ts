@@ -13,19 +13,23 @@ export function aiErrorText(e: unknown): string {
 export async function callAi<T>(config: AiConfig, body: Record<string, unknown>): Promise<T> {
   let res: Response;
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 30000);
+  const timer = setTimeout(() => ctl.abort(), 45000);
   try {
     res = await fetch(aiEndpoint(config), {
       method: 'POST', signal: ctl.signal,
       headers: { 'Content-Type': 'application/json', apikey: config.anonKey.trim(), Authorization: `Bearer ${config.anonKey.trim()}` },
       body: JSON.stringify({ ...body, passcode: config.passcode.trim() }),
     });
-  } catch {
-    throw new AiError(typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'unknown');
+  } catch (e) {
+    if ((e as { name?: string })?.name === 'AbortError') throw new AiError('timeout');
+    throw new AiError(typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'unknown', String((e as Error)?.message ?? '').slice(0, 120));
   } finally {
     clearTimeout(timer);
   }
-  const data = await res.json().catch(() => null) as ({ error?: string; detail?: string } & T) | null;
-  if (!res.ok || !data) throw new AiError(typeof data?.error === 'string' ? data.error : 'unknown', typeof data?.detail === 'string' ? data.detail : '');
+  const raw = await res.text().catch(() => '');
+  let data: ({ error?: string; detail?: string } & T) | null = null;
+  try { data = JSON.parse(raw); } catch { data = null; }
+  if (!data) throw new AiError('http', `HTTP ${res.status}${raw ? `: ${raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140)}` : ''}`);
+  if (!res.ok) throw new AiError(typeof data.error === 'string' ? data.error : 'http', typeof data.detail === 'string' && data.detail ? data.detail : typeof data.error === 'string' ? '' : `HTTP ${res.status}`);
   return data;
 }

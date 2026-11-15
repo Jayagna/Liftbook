@@ -75,5 +75,7 @@ export const AI_ERRORS: Record<string, string> = {
   upstream: 'Gemini refused the request. Check the key and model name in Supabase.',
   empty: 'The AI gave no usable answer. Try wording it differently.',
   offline: 'No connection. The AI needs the internet; everything else works offline.',
+  timeout: 'The AI took too long to answer. Try again; if it keeps happening, check the function logs in Supabase.',
+  http: 'The AI function answered with an error instead of a result. It may have failed to deploy: open Edge Functions > ai > Logs in Supabase.',
   unknown: 'The AI function could not be reached. Check the project URL and key in Profile.',
 };

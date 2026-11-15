@@ -2,7 +2,7 @@
 // Every number shown here comes from the food list or from what the user typed. Nothing is guessed.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,6 +44,7 @@ export default function AddFood() {
   const [added, setAdded] = useState({ n: 0, kcal: 0 });
 
   const foods = useMemo(() => knownFoods(days, customFoods), [days, customFoods]);
+  const addAi = (items: EstimateItem[]) => { actions.addMeals(items.map((x) => ({ name: x.name, qty: 1, kcal: x.kcal, p: x.p, c: x.c, f: x.f, source: 'ai' as const, slot })), date); note(items.length, items.reduce((a, x) => a + x.kcal, 0)); };
   const results = useMemo(() => searchFoods(foods, q, 20), [foods, q]);
   const recents = useMemo(() => recentFoods(days, foods, today(), 12), [days, foods]);
 
@@ -96,6 +97,7 @@ export default function AddFood() {
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: insets.bottom + 130, gap: space.md }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {tab === 'foods' && (
           <>
+            <QuickAi slot={slot} onAddAi={addAi} />
             <View style={styles.search}>
               <Ionicons name="search" size={18} color={color.text3} />
               <TextInput value={q} onChangeText={setQ} placeholder="Search: egg, roti, dal, paneer…" placeholderTextColor={color.text3} style={styles.searchInput} accessibilityLabel="Search foods" autoCorrect={false} />
@@ -155,7 +157,7 @@ export default function AddFood() {
           </>
         )}
 
-        {tab === 'describe' && <Describe foods={foods} slot={slot} onAddAi={(items) => { actions.addMeals(items.map((x) => ({ name: x.name, qty: 1, kcal: x.kcal, p: x.p, c: x.c, f: x.f, source: 'ai' as const, slot })), date); note(items.length, items.reduce((a, x) => a + x.kcal, 0)); }} onAdd={(items) => { actions.addMeals(items.map((x) => ({ ...toMeal(x.food!, x.qty), slot })), date); note(items.length, items.reduce((a, x) => a + scale(x.food!, x.qty).kcal, 0)); }} onSearch={(text) => { setQ(text); setTab('foods'); }} />}
+        {tab === 'describe' && <Describe foods={foods} slot={slot} onAddAi={addAi} onAdd={(items) => { actions.addMeals(items.map((x) => ({ ...toMeal(x.food!, x.qty), slot })), date); note(items.length, items.reduce((a, x) => a + scale(x.food!, x.qty).kcal, 0)); }} onSearch={(text) => { setQ(text); setTab('foods'); }} />}
 
         {tab === 'new' && <NewFood initialName={q.trim()} slot={slot} mine={customFoods} onSaved={(f, log) => { actions.addCustomFood(f); if (log) addFood({ ...f, custom: true }, 1); else haptic.success(); }} />}
       </ScrollView>
@@ -262,12 +264,38 @@ function Describe({ foods, slot, onAdd, onAddAi, onSearch }: { foods: FoodDef[];
 }
 
 /** AI estimate for a described meal. Shown as an estimate, editable by removing items, and saved only on a tap. */
-function AiEstimate({ text, slot, onAddAi }: { text: string; slot: MealSlot; onAddAi: (items: EstimateItem[]) => void }) {
+/** Top of Add food: type what you ate and get an AI estimate in one step. */
+function QuickAi({ slot, onAddAi }: { slot: MealSlot; onAddAi: (items: EstimateItem[]) => void }) {
+  const ai = useApp((s) => s.ai);
+  const [text, setText] = useState('');
+  const [go, setGo] = useState(0);
+  if (!aiReady(ai)) return null;
+  return (
+    <View style={[styles.card, styles.quickAi]}>
+      <View style={styles.between}>
+        <T v="label" style={{ color: color.lime }}>Log with AI</T>
+        <T v="small">Estimate · you confirm</T>
+      </View>
+      <View style={styles.quickRow}>
+        <TextInput value={text} onChangeText={setText} placeholder="e.g. 2 rotis, dal and a glass of milk" placeholderTextColor={color.text3}
+          style={styles.quickInput} accessibilityLabel="What did you eat" returnKeyType="go" onSubmitEditing={() => text.trim() && setGo(go + 1)} />
+        <PressableScale style={[styles.quickGo, !text.trim() && { opacity: 0.4 }]} disabled={!text.trim()} onPress={() => setGo(go + 1)} accessibilityLabel="Estimate with AI">
+          <Ionicons name="sparkles" size={18} color={color.limeInk} />
+        </PressableScale>
+      </View>
+      <AiEstimate text={text} slot={slot} onAddAi={(items) => { onAddAi(items); setText(''); }} bare trigger={go} />
+    </View>
+  );
+}
+
+function AiEstimate({ text, slot, onAddAi, bare = false, trigger = 0 }: { text: string; slot: MealSlot; onAddAi: (items: EstimateItem[]) => void; bare?: boolean; trigger?: number }) {
   const ai = useApp((s) => s.ai);
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<{ for: string; items: EstimateItem[]; note: string } | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  if (!aiReady(ai)) return <T v="small" style={{ color: color.text3 }}>For foods that are not in the list, connect the AI assistant in Profile to get an estimate.</T>;
+ const [err, setErr] = useState<string | null>(null);
+  const askRef = useRef<() => void>(() => {});
+  useEffect(() => { if (bare && trigger > 0) askRef.current(); }, [trigger]);
+  if (!aiReady(ai)) return bare ? null : <T v="small" style={{ color: color.text3 }}>For foods that are not in the list, connect the AI assistant in Profile to get an estimate.</T>;
   const ask = async () => {
     if (!text.trim() || busy) return;
     setBusy(true); setErr(null); setRes(null);
@@ -278,11 +306,14 @@ function AiEstimate({ text, slot, onAddAi }: { text: string; slot: MealSlot; onA
   };
   const shown = res && res.for === text ? res : null;
   const total = (shown?.items ?? []).reduce((a, x) => a + x.kcal, 0);
+  askRef.current = () => { void ask(); };
+  if (bare && !busy && !err && !shown) return null;
   return (
-    <View style={styles.card}>
-      <T v="label">Or ask the AI</T>
-      <T v="small">Sends only the words you typed above to Gemini. You see the estimate before anything is saved.</T>
-      <Pill label={busy ? 'Estimating…' : 'Estimate with AI'} onPress={ask} style={{ alignSelf: 'flex-start', opacity: text.trim() ? 1 : 0.4 }} />
+    <View style={bare ? { gap: space.md } : styles.card}>
+      {!bare && <T v="label">Or ask the AI</T>}
+      {!bare && <T v="small">Sends only the words you typed above to Gemini. You see the estimate before anything is saved.</T>}
+      {!bare && <Pill label={busy ? 'Estimating…' : 'Estimate with AI'} onPress={ask} style={{ alignSelf: 'flex-start', opacity: text.trim() ? 1 : 0.4 }} />}
+      {bare && busy && <T v="small" style={{ color: color.text }}>Estimating…</T>}
       {err && <T v="small" style={{ color: color.warn }} accessibilityRole="alert">{err}</T>}
       {shown && shown.items.length === 0 && <T v="small" style={{ color: color.warn }}>{shown.note || 'The AI could not estimate that. Try naming the foods and amounts.'}</T>}
       {shown && shown.items.length > 0 && (
@@ -369,6 +400,10 @@ function NewFood({ initialName, slot, mine, onSaved }: { initialName: string; sl
 }
 
 const styles = StyleSheet.create({
+  quickAi: { borderColor: 'rgba(200,255,80,0.3)' },
+  quickRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  quickInput: { flex: 1, minWidth: 0, height: 48, paddingHorizontal: 14, borderRadius: radius.md, backgroundColor: color.bg2, color: color.text, fontFamily: font.bodyMed, fontSize: 15, borderWidth: StyleSheet.hairlineWidth, borderColor: color.lineStrong },
+  quickGo: { width: 48, height: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: color.lime },
   root: { flex: 1, backgroundColor: color.bg },
   top: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingBottom: space.md },
   round: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card, borderWidth: StyleSheet.hairlineWidth, borderColor: color.lineStrong },
