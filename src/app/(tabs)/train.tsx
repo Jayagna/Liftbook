@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import Animated, { FadeIn, LinearTransition, useReducedMotion } from 'react-native-reanimated';
+import Animated, { FadeIn, LinearTransition, ZoomIn, useReducedMotion } from 'react-native-reanimated';
 import { SampleBanner } from '@/components/SampleBanner';
 import { RenderBody } from '@/components/dashboard/RenderBody';
 import { FormLink } from '@/components/train/FormLink';
@@ -94,7 +94,7 @@ export default function Train() {
       )}
 
       {workout && (
-        <Card tint="rgba(200,255,80,0.06)" padded={false}>
+        <Card key={date} tint="lime" padded={false}>
           <View style={{ padding: 16, paddingBottom: 0 }}>
             <T v="label">{DOW_SHORT[dow(date)]} · ≈ {sessionMinutes(workout.exercises)} min</T>
             <T v="title" style={{ marginTop: 2 }}>{workout.name}</T>
@@ -127,7 +127,7 @@ export default function Train() {
       )}
       {workout && planned.length > 0 && <T v="label" style={{ marginTop: space.xs }}>{isToday ? 'Or log sets quickly' : 'Log sets'}</T>}
 
-      {[...planned, ...extras].map((e, i) => <ExerciseCard key={e.name} e={e} date={date} startOpen={i === 0} />)}
+      {[...planned, ...extras].map((e, i) => <ExerciseCard key={date + e.name} e={e} date={date} startOpen={i === 0} />)}
     </Screen>
   );
 }
@@ -194,7 +194,7 @@ function ExerciseCard({ e, date, startOpen }: { e: PlannedExercise; date: string
           </View>
           <View style={{ flex: 1 }}>
             <T v="bodyMed" style={{ fontSize: 16 }}>{e.name}</T>
-            <T v="small">{e.sets} × {e.repLow}–{e.repHigh}{timed ? ' s' : ''} · rest {Math.round(e.restSec / 15) * 15 >= 60 ? `${Math.round(e.restSec / 30) / 2} min` : `${e.restSec} s`}{ex ? ` · ${ex.primary.map((m) => MUSCLE_LABEL[m]).join(', ')}` : ''}</T>
+            <T v="small">{e.sets} × {e.repLow}–{e.repHigh}{timed ? ' s' : ''} · rest {Math.round(e.restSec / 15) * 15 >= 60 ? `${Math.round(e.restSec / 30) / 2} min` : `${e.restSec} s`}</T>
           </View>
           <FormLink name={e.name} />
           <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={color.text3} />
@@ -215,11 +215,13 @@ function ExerciseCard({ e, date, startOpen }: { e: PlannedExercise; date: string
                   const before = Math.max(prev, ...mine.slice(0, i).map((x) => e1rm(x.kg, x.reps)));
                   const pr = isPR(s, before);
                   return (
-                    <PressableScale key={s.id} onLongPress={() => actions.removeSet(s.id, date)} style={[styles.set, pr && styles.setPR]} accessibilityLabel={`Set ${i + 1}, long press to delete`}>
+                    <Animated.View key={s.id} entering={reduce ? undefined : ZoomIn.springify().damping(14).stiffness(260)}>
+                    <PressableScale onLongPress={() => actions.removeSet(s.id, date)} style={[styles.set, pr && styles.setPR]} accessibilityLabel={`Set ${i + 1}, long press to delete`}>
                       <T style={styles.setIdx}>{i + 1}</T>
                       <T style={styles.setVal}>{timed ? `${s.reps}s` : s.kg > 0 ? `${fmtKg(s.kg)} × ${s.reps}` : `BW × ${s.reps}`}</T>
                       {pr && <T style={styles.prTag}>PR</T>}
                     </PressableScale>
+                    </Animated.View>
                   );
                 })}
               </View>

@@ -1,41 +1,27 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, type ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated';
-import { color, radius, space } from '@/theme/tokens';
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
+import { color, motion, radius, space } from '@/theme/tokens';
 import { T } from './T';
 
-/** Rounded glass-like card: a faint top highlight over the card colour, hairline border. */
+/**
+ * Matte panel with a hairline edge. `tint` marks the one card that matters most on a screen:
+ * it gets a lime rule along the top instead of a different fill, so emphasis stays quiet.
+ * Cards rise into place once, in order, when a screen first appears.
+ */
 export function Card({
   children, style, tint, index = 0, padded = true,
 }: { children: ReactNode; style?: StyleProp<ViewStyle>; tint?: string; index?: number; padded?: boolean }) {
   const reduce = useReducedMotion();
-  // Cards flip up into place in 3D, staggered by index.
   const t = useSharedValue(reduce ? 1 : 0);
-  const o = useSharedValue(reduce ? 1 : 0);
   useEffect(() => {
     if (reduce) return;
-    t.value = withDelay(70 * index, withSpring(1, { damping: 16, stiffness: 120, mass: 0.9 }));
-    o.value = withDelay(70 * index, withTiming(1, { duration: 380, easing: Easing.out(Easing.quad) }));
+    t.value = withDelay(Math.min(index, 6) * motion.stagger, withTiming(1, { duration: motion.enter, easing: Easing.out(Easing.cubic) }));
   }, []);
-  const enter = useAnimatedStyle(() => ({
-    opacity: o.value,
-    transform: [
-      { perspective: 900 },
-      { translateY: (1 - t.value) * 36 },
-      { rotateX: `${(1 - t.value) * 22}deg` },
-      { scale: 0.96 + t.value * 0.04 },
-    ],
-  }));
+  const enter = useAnimatedStyle(() => ({ opacity: t.value, transform: [{ translateY: (1 - t.value) * 14 }] }));
   return (
-    <Animated.View style={[styles.card, style, enter]}>
-      <LinearGradient
-        colors={[tint ?? 'rgba(255,255,255,0.055)', 'rgba(255,255,255,0)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0.6, y: 1 }}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
+    <Animated.View style={[styles.card, tint ? styles.accent : null, style, enter]}>
+      {tint ? <View style={styles.rule} pointerEvents="none" /> : null}
       <View style={padded ? styles.pad : undefined}>{children}</View>
     </Animated.View>
   );
@@ -58,10 +44,12 @@ const styles = StyleSheet.create({
     backgroundColor: color.card,
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: color.lineStrong,
+    borderColor: color.line,
     overflow: 'hidden',
   },
+  accent: { borderColor: 'rgba(200,255,80,0.28)' },
+  rule: { position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: color.lime },
   pad: { padding: space.lg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: space.md },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: space.md, gap: space.md },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
 });

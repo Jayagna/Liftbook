@@ -13,7 +13,7 @@ export function CaloriesWidget({ s, index }: { s: Summary; index: number }) {
   const eaten = s.totals.kcal;
   const left = kcal - eaten;
   return (
-    <Card index={index} tint="rgba(200,255,80,0.07)">
+    <Card index={index}>
       <CardHeader title="Calories" right={<T v="small">Estimated target</T>} />
       <View style={styles.calRow}>
         <Ring size={164} stroke={14} progress={kcal ? eaten / kcal : 0} tint={color.lime} tint2="#E9FFB0">

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { Bar } from '@/components/ui/Bar';
 import { Card, CardHeader } from '@/components/ui/Card';
+import { CountUp } from '@/components/ui/CountUp';
 import { Pill } from '@/components/ui/Pill';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Ring } from '@/components/ui/Ring';
@@ -32,13 +33,13 @@ export function HydrationWidget({ s, index }: { s: Summary; index: number }) {
     if (before < s.waterTarget && before + ml >= s.waterTarget) haptic.success();
   };
   return (
-    <Card index={index} tint="rgba(63,169,255,0.08)">
+    <Card index={index}>
       <CardHeader title="Hydration" right={<T v="small">Estimate · {L(s.waterTarget)} L goal</T>} />
       <View style={styles.row}>
         <WaterTank width={78} height={132} progress={s.waterTarget ? s.waterMl / s.waterTarget : 0} />
         <View style={{ flex: 1, gap: space.sm }}>
           <T style={styles.big}>
-            {L(s.waterMl)}<T style={styles.unit}> L</T>
+            <CountUp value={s.waterMl} format={(n) => L(n)} duration={500} /><T style={styles.unit}> L</T>
           </T>
           <T v="small">{left > 0 ? `${L(left)} L to go` : 'Goal reached. Nice work.'}</T>
           <View style={styles.pills}>
@@ -85,7 +86,7 @@ export function WorkoutWidget({ s, index }: { s: Summary; index: number }) {
   const planned = w.exercises.reduce((a, e) => a + e.sets, 0);
   const done = Math.min(s.setsDone, planned);
   return (
-    <Card index={index} tint="rgba(200,255,80,0.06)">
+    <Card index={index}>
       <CardHeader title="Workout of the day" right={<T v="small">≈ {s.workoutMinutes} min</T>} />
       <T v="title">{w.name}</T>
       <View style={[styles.pills, { marginTop: space.sm }]}>

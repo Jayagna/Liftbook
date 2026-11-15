@@ -16,6 +16,7 @@ import type { MuscleGroup } from '@/domain/types';
 import { haptic } from '@/hooks/haptics';
 import type { useDaySummary } from '@/store/selectors';
 import { useApp } from '@/store/store';
+import { useLayout } from '@/theme/layout';
 import { color, font, radius, space } from '@/theme/tokens';
 
 type Summary = NonNullable<ReturnType<typeof useDaySummary>>;
@@ -32,44 +33,56 @@ export function TodayRingsWidget({ s, index }: { s: Summary; index: number }) {
     { label: 'Protein', v: `${Math.round(s.totals.p)} / ${s.targets.protein} g`, p: proP, c: color.protein },
     { label: 'Water', v: `${(s.waterMl / 1000).toFixed(1)} / ${(s.waterTarget / 1000).toFixed(1)} L`, p: waterP, c: color.water },
   ];
+  const L = useLayout();
+  const side = !L.compact;
+  const ring = (
+    <View style={side ? { width: 300 } : undefined}>
+      {use3d ? (
+        <Rings3D height={side ? 290 : 270} rings={[{ progress: kcalP, color: color.lime }, { progress: proP, color: color.protein }, { progress: waterP, color: color.water }]} />
+      ) : (
+        <View style={styles.flat}>
+          <Ring size={230} stroke={16} progress={kcalP} tint={color.lime}>
+            <Ring size={184} stroke={14} progress={proP} tint={color.protein}>
+              <Ring size={142} stroke={12} progress={waterP} tint={color.water} />
+            </Ring>
+          </Ring>
+        </View>
+      )}
+      <View style={styles.center} pointerEvents="none">
+        <CountUp value={Math.abs(left)} style={styles.big} />
+        <View style={styles.pill}><T v="label" style={{ color: left >= 0 ? color.text : color.danger }}>{left >= 0 ? 'kcal left' : 'kcal over'}</T></View>
+      </View>
+    </View>
+  );
+  const gauges = (
+    <View style={[styles.gauges, side && { flex: 1, justifyContent: 'center', paddingLeft: 0, paddingRight: space.xl, gap: space.xl }]}>
+      {legend.map((l, i) => (
+        <View key={l.label} style={{ gap: 7 }} accessible accessibilityLabel={`${l.label}: ${l.v}, ${Math.round(l.p * 100)} percent`}>
+          <View style={styles.gaugeHead}>
+            <View style={styles.legendHead}>
+              <View style={[styles.dot, { backgroundColor: l.c }]} />
+              <T v="label" style={{ color: color.text2 }}>{l.label}</T>
+            </View>
+            <View style={styles.gaugeNums}>
+              <T v="small" numberOfLines={1}>{l.v}</T>
+              <CountUp value={Math.min(l.p, 9.99) * 100} format={(n) => `${Math.round(n)}%`} style={[styles.legendPct, side && { fontSize: 34, lineHeight: 34 }]} />
+            </View>
+          </View>
+          <Bar progress={l.p} tint={l.c} height={side ? 6 : 5} delay={200 + i * 90} />
+        </View>
+      ))}
+      {s.targets.sportExtra > 0 && (
+        <View style={styles.bonus}><Ionicons name="flash" size={14} color={color.lime} /><T v="small" style={{ color: color.lime }}>+{s.targets.sportExtra} kcal added for today’s sport</T></View>
+      )}
+    </View>
+  );
   return (
-    <Card index={index} padded={false} tint="rgba(200,255,80,0.10)" style={styles.hero}>
+    <Card index={index} padded={false} tint="lime">
       <View style={styles.heroTop}>
         <T v="label">Today</T>
         <T v="small">Targets are estimates</T>
       </View>
-      <View>
-        {use3d ? (
-          <Rings3D height={270} rings={[{ progress: kcalP, color: color.lime }, { progress: proP, color: color.protein }, { progress: waterP, color: color.water }]} />
-        ) : (
-          <View style={styles.flat}>
-            <Ring size={230} stroke={16} progress={kcalP} tint={color.lime}>
-              <Ring size={184} stroke={14} progress={proP} tint={color.protein}>
-                <Ring size={142} stroke={12} progress={waterP} tint={color.water} />
-              </Ring>
-            </Ring>
-          </View>
-        )}
-        <View style={styles.center} pointerEvents="none">
-          <CountUp value={Math.abs(left)} style={styles.big} />
-          <View style={styles.pill}><T v="label" style={{ color: left >= 0 ? color.text : color.danger }}>{left >= 0 ? 'kcal left' : 'kcal over'}</T></View>
-        </View>
-      </View>
-      <View style={styles.legend}>
-        {legend.map((l) => (
-          <View key={l.label} style={styles.legendItem}>
-            <View style={styles.legendHead}>
-              <View style={[styles.dot, { backgroundColor: l.c }]} />
-              <T v="label">{l.label}</T>
-            </View>
-            <T style={styles.legendPct}>{Math.round(Math.min(l.p, 9.99) * 100)}%</T>
-            <T v="small" numberOfLines={1}>{l.v}</T>
-          </View>
-        ))}
-      </View>
-      {s.targets.sportExtra > 0 && (
-        <View style={styles.bonus}><Ionicons name="flash" size={14} color={color.lime} /><T v="small" style={{ color: color.lime }}>+{s.targets.sportExtra} kcal added for today’s sport</T></View>
-      )}
+      {side ? <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>{ring}{gauges}</View> : <>{ring}{gauges}</>}
     </Card>
   );
 }
@@ -187,18 +200,18 @@ function Key({ c, label }: { c: string; label: string }) {
 }
 
 const styles = StyleSheet.create({
-  hero: { borderColor: 'rgba(200,255,80,0.22)' },
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', padding: space.lg, paddingBottom: 0 },
   flat: { height: 270, alignItems: 'center', justifyContent: 'center' },
   center: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   big: { fontFamily: font.display, fontSize: 50, lineHeight: 52, color: color.text, textShadowColor: 'rgba(0,0,0,0.85)', textShadowRadius: 16 },
   pill: { marginTop: 2, paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: 'rgba(13,16,16,0.72)' },
-  legend: { flexDirection: 'row', paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.sm },
-  legendItem: { flex: 1, padding: space.md, borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.04)', gap: 2 },
+  gauges: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md },
+  gaugeHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: space.md },
+  gaugeNums: { flexDirection: 'row', alignItems: 'baseline', gap: 10, flexShrink: 1 },
   legendHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendPct: { fontFamily: font.display, fontSize: 26, color: color.text },
+  legendPct: { fontFamily: font.display, fontSize: 26, lineHeight: 26, color: color.text, minWidth: 54, textAlign: 'right', fontVariant: ['tabular-nums'] },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  bonus: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: space.lg, paddingBottom: space.lg, marginTop: -space.sm },
+  bonus: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   recRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: 4, paddingHorizontal: 6, borderRadius: radius.sm },
   recRowOn: { backgroundColor: 'rgba(255,255,255,0.06)' },
   recPct: { fontFamily: font.display, fontSize: 18, width: 44, textAlign: 'right' },

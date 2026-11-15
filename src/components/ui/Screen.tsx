@@ -2,31 +2,39 @@ import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '@/store/store';
+import { useLayout } from '@/theme/layout';
 import { color, radius, space } from '@/theme/tokens';
 import { Aurora } from './Aurora';
 import { T } from './T';
 
 export const TAB_BAR_SPACE = 110;
 
-/** Scrollable tab screen with a large display title. */
+/** Scrollable tab screen with a large display title. Content is centred and capped in width on big screens. */
 export function Screen({ title, eyebrow, right, children }: { title: string; eyebrow?: string; right?: ReactNode; children: ReactNode }) {
   const insets = useSafeAreaInsets();
+  const L = useLayout();
   return (
     <View style={styles.root}>
       <Aurora />
       <ScrollView
-        contentContainerStyle={{ paddingTop: insets.top + space.md, paddingBottom: insets.bottom + TAB_BAR_SPACE, paddingHorizontal: space.lg, gap: space.md }}
+        contentContainerStyle={{
+          paddingTop: insets.top + (L.wide ? space.xxl : space.md),
+          paddingBottom: L.wide ? 56 : insets.bottom + TAB_BAR_SPACE,
+          paddingLeft: L.rail + L.gutter, paddingRight: L.gutter, alignItems: 'center',
+        }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <View style={{ flex: 1 }}>
-            {eyebrow ? <T v="label" style={{ color: color.lime }}>{eyebrow}</T> : null}
-            <T v="title" style={styles.title}>{title}</T>
+        <View style={{ width: '100%', maxWidth: L.contentMax, gap: space.md }}>
+          <View style={[styles.header, L.wide && { marginBottom: space.md }]}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              {eyebrow ? <T v="label" style={{ color: color.lime }}>{eyebrow}</T> : null}
+              <T v="title" style={[styles.title, L.tiny && styles.titleTiny, L.wide && styles.titleWide]}>{title}</T>
+            </View>
+            {right}
           </View>
-          {right}
+          <StorageBanner />
+          {children}
         </View>
-        <StorageBanner />
-        {children}
       </ScrollView>
     </View>
   );
@@ -49,4 +57,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.bg },
   header: { flexDirection: 'row', alignItems: 'flex-end', gap: space.md, marginBottom: space.xs },
   title: { fontSize: 38, lineHeight: 40, marginTop: 2 },
+  titleTiny: { fontSize: 32, lineHeight: 34 },
+  titleWide: { fontSize: 52, lineHeight: 54, letterSpacing: 0 },
 });

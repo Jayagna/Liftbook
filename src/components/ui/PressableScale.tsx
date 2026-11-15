@@ -1,6 +1,7 @@
 import { Pressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
 import { haptic } from '@/hooks/haptics';
+import { motion } from '@/theme/tokens';
 
 const APressable = Animated.createAnimatedComponent(Pressable);
 
@@ -15,8 +16,8 @@ export function PressableScale({
     <APressable
       {...rest}
       accessibilityRole={rest.accessibilityRole ?? 'button'}
-      onPressIn={(e) => { if (!reduce) s.value = withSpring(scaleTo, { damping: 18, stiffness: 420 }); rest.onPressIn?.(e); }}
-      onPressOut={(e) => { s.value = withSpring(1, { damping: 14, stiffness: 300 }); rest.onPressOut?.(e); }}
+      onPressIn={(e) => { if (!reduce) s.value = withSpring(scaleTo, motion.press); rest.onPressIn?.(e); }}
+      onPressOut={(e) => { s.value = withSpring(1, motion.release); rest.onPressOut?.(e); }}
       onPress={(e) => { if (haptics) haptic.tap(); onPress?.(e); }}
       style={[style, a]}
     >

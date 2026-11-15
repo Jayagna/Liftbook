@@ -80,11 +80,13 @@ export default function Progress() {
       <SampleBanner />
       <Choice options={RANGES} value={range} onChange={setRange} />
 
-      <View style={styles.kpis}>
-        <Kpi label="Workouts" value={String(ov.workouts)} note={ov.prev.workouts > 0 ? (dW === 0 ? 'same as before' : `${signed(dW)} vs before`) : undefined} />
-        <Kpi label="Volume" value={tonnes(ov.volumeKg)} note={dV == null ? undefined : dV === 0 ? 'same as before' : `${signed(dV)}% vs before`} />
-        <Kpi label="Protein" value={ov.fedDays ? `${ov.proteinDays}/${ov.fedDays}` : '–'} note={ov.fedDays ? 'days at 90%+' : undefined} />
-      </View>
+      <Card index={0} padded={false}>
+        <View style={styles.kpis}>
+          <Kpi label="Workouts" value={String(ov.workouts)} note={ov.prev.workouts > 0 ? (dW === 0 ? 'same as before' : `${signed(dW)} vs before`) : undefined} />
+          <Kpi label="Volume" value={tonnes(ov.volumeKg)} note={dV == null ? undefined : dV === 0 ? 'same as before' : `${signed(dV)}% vs before`} />
+          <Kpi label="Protein" value={ov.fedDays ? `${ov.proteinDays}/${ov.fedDays}` : '–'} note={ov.fedDays ? 'days at 90%+' : undefined} />
+        </View>
+      </Card>
       {ov.prev.workouts > 0 && <T v="small" style={{ marginTop: -4 }}>“Before” is {before}.</T>}
 
       <Card index={0}>
@@ -130,7 +132,7 @@ export default function Progress() {
         <T v="small" style={{ marginTop: space.sm }}>Only days with food logged are averaged, so a day you forgot does not drag it down. Sport days have a higher target than the line shows.</T>
       </Card>
 
-      <Card index={4} tint="rgba(61,220,151,0.06)">
+      <Card index={4}>
         <CardHeader title={`Protein · average per ${SPAN[range]}`} right={<T v="small">{ov.protein != null ? `Avg ${ov.protein} g` : ''}</T>} />
         <BarChart
           bars={bk.map((b) => ({ label: b.label, title: b.title, value: b.protein }))} unit="g" tint={color.protein}
@@ -139,7 +141,7 @@ export default function Progress() {
         />
       </Card>
 
-      <Card index={5} tint="rgba(63,169,255,0.06)">
+      <Card index={5}>
         <CardHeader title="Bodyweight" right={<T v="small">{ov.weight ? `${signed(ov.weight.change)} kg` : ''}</T>} />
         <LineChart points={bw} tint={color.water} unit="kg" empty="Weigh in on a few mornings to see your trend." />
       </Card>
@@ -167,7 +169,7 @@ export default function Progress() {
         )}
       </Card>
 
-      <Card index={7} tint="rgba(63,169,255,0.06)">
+      <Card index={7}>
         <CardHeader title={`Water · average per ${SPAN[range]}`} right={<T v="small">{ov.waterMl != null ? `Avg ${Math.round(ov.waterMl / 100) / 10} L` : ''}</T>} />
         <BarChart
           bars={bk.map((b) => ({ label: b.label, title: b.title, value: b.waterMl == null ? null : b.waterMl / 1000 }))} unit="L" tint={color.water}
@@ -211,17 +213,18 @@ export default function Progress() {
 
 function Kpi({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
-    <Card style={{ flex: 1 }}>
+    <View style={styles.kpiCell}>
       <T v="label" numberOfLines={1}>{label}</T>
-      <T style={styles.kpi} numberOfLines={1}>{value}</T>
-      {note ? <T style={styles.kpiNote} numberOfLines={1}>{note}</T> : null}
-    </Card>
+      <T style={styles.kpi} numberOfLines={1} adjustsFontSizeToFit>{value}</T>
+      <T style={styles.kpiNote} numberOfLines={1}>{note ?? ' '}</T>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  kpis: { flexDirection: 'row', gap: space.sm },
-  kpi: { fontFamily: font.display, fontSize: 28, lineHeight: 30, color: color.text, marginTop: 4 },
+  kpis: { flexDirection: 'row' },
+  kpiCell: { flex: 1, minWidth: 0, paddingVertical: space.lg, paddingHorizontal: space.md, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: color.line, marginLeft: -StyleSheet.hairlineWidth },
+  kpi: { fontFamily: font.display, fontSize: 36, lineHeight: 38, color: color.text, marginTop: 6, fontVariant: ['tabular-nums'] },
   kpiNote: { fontFamily: font.body, fontSize: 10.5, color: color.text2, marginTop: 2 },
   between: { flexDirection: 'row', justifyContent: 'space-between' },
   pr: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: 10 },
