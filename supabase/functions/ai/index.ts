@@ -33,7 +33,7 @@ const MEAL_SCHEMA = {
         type: 'OBJECT',
         properties: {
           name: { type: 'STRING' }, assumed: { type: 'STRING' }, kcal: { type: 'NUMBER' }, p: { type: 'NUMBER' },
-          c: { type: 'NUMBER' }, f: { type: 'NUMBER' }, confidence: { type: 'STRING', enum: ['low', 'medium', 'high'] },
+          c: { type: 'NUMBER' }, f: { type: 'NUMBER' }, confidence: { type: 'STRING', description: 'low, medium or high' },
         },
         required: ['name', 'assumed', 'kcal', 'p', 'c', 'f', 'confidence'],
       },
@@ -48,36 +48,48 @@ const MEAL_SCHEMA = {
 const CHAT_MODELS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite'];
 const MEAL_MODELS = ['gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash'];
 
+// Request settings from fastest to most basic. Models differ in what they accept, so when Google answers
+// "invalid argument" (400) the next, simpler settings are tried before moving to another model.
+function variants(json: boolean) {
+  const nothink = { thinkingConfig: { thinkingBudget: 0 } };
+  if (!json) return [{ temperature: 0.6, maxOutputTokens: 700, ...nothink }, { temperature: 0.6, maxOutputTokens: 700 }];
+  const schema = { responseMimeType: 'application/json', responseSchema: MEAL_SCHEMA, temperature: 0.2 };
+  const plainJson = { responseMimeType: 'application/json', temperature: 0.2 };
+  return [{ ...schema, ...nothink }, schema, { ...plainJson, ...nothink }, plainJson, { temperature: 0.2 }];
+}
+const JSON_HINT = `\nAnswer with JSON only, exactly in this shape: {"items":[{"name":"","assumed":"","kcal":0,"p":0,"c":0,"f":0,"confidence":"low|medium|high"}],"note":""}`;
+
 async function gemini(system: string, contents: unknown[], json: boolean) {
   const list = json ? MEAL_MODELS : CHAT_MODELS;
   const models = [...new Set([...(Deno.env.get('GEMINI_MODEL') ? [MODEL] : []), ...list])];
   let last = { error: 'upstream', status: 0, detail: '' };
   for (const model of models) {
-    // Turn off "thinking" so answers come back in a second or two. Some models do not accept this, so retry without it.
-    for (const fast of [true, false]) {
-      const base = json ? { responseMimeType: 'application/json', responseSchema: MEAL_SCHEMA, temperature: 0.2 } : { temperature: 0.6, maxOutputTokens: 700 };
+    for (const config of variants(json)) {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY },
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: system }] },
+          systemInstruction: { parts: [{ text: json && !('responseSchema' in config) ? system + JSON_HINT : system }] },
           contents,
-          generationConfig: fast ? { ...base, thinkingConfig: { thinkingBudget: 0 } } : base,
+          generationConfig: config,
         }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         // Google's own message, shortened, so the app can say what actually went wrong (it never contains the key).
         const detail = String(data?.error?.message ?? '').slice(0, 220);
+        console.error(`gemini ${model} ${res.status}: ${detail}`);
         last = { error: res.status === 429 ? 'busy' : 'upstream', status: res.status, detail: `${model}: ${res.status} ${detail}`.trim() };
-        if (fast && res.status === 400 && /think/i.test(detail)) continue;
+        if (res.status === 400 && !/api key/i.test(detail)) continue; // try simpler settings
         break;
       }
-      const text = (data?.candidates?.[0]?.content?.parts ?? []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? '').join('');
+      let text = (data?.candidates?.[0]?.content?.parts ?? []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? '').join('');
+      if (json) text = text.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
       const why = data?.candidates?.[0]?.finishReason ?? data?.promptFeedback?.blockReason ?? '';
       return text ? { text } : { error: 'empty', status: 200, detail: why ? `${model}: ${why}` : '' };
     }
-    if (last.status !== 404 && !(last.status === 400 && /model/i.test(last.detail))) return last;
+    // A wrong key or used-up quota will not get better with another model.
+    if (last.status === 401 || last.status === 403 || last.status === 429 || /api key/i.test(last.detail)) return last;
   }
   return last;
 }
