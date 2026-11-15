@@ -269,7 +269,18 @@ function QuickAi({ slot, onAddAi }: { slot: MealSlot; onAddAi: (items: EstimateI
   const ai = useApp((s) => s.ai);
   const [text, setText] = useState('');
   const [go, setGo] = useState(0);
-  if (!aiReady(ai)) return null;
+  if (!aiReady(ai)) {
+    return (
+      <PressableScale style={[styles.card, styles.quickAi, { flexDirection: 'row', alignItems: 'center', gap: space.md }]} onPress={() => router.push('/profile')} accessibilityLabel="Turn on Log with AI in Profile">
+        <Ionicons name="sparkles" size={20} color={color.lime} />
+        <View style={{ flex: 1 }}>
+          <T v="label" style={{ color: color.lime }}>Log with AI</T>
+          <T v="small">Not connected. Tap to open Profile, enter the passcode and tap Connect.</T>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={color.text3} />
+      </PressableScale>
+    );
+  }
   return (
     <View style={[styles.card, styles.quickAi]}>
       <View style={styles.between}>
