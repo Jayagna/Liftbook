@@ -8,9 +8,9 @@ import { Aurora } from '@/components/ui/Aurora';
 import { Pill } from '@/components/ui/Pill';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { T } from '@/components/ui/T';
-import { AI_ERRORS, aiReady, coachContext, type ChatMessage } from '@/domain/ai';
+import { aiReady, coachContext, type ChatMessage } from '@/domain/ai';
 import { today } from '@/domain/dates';
-import { AiError, callAi } from '@/hooks/aiClient';
+import { aiErrorText, callAi } from '@/hooks/aiClient';
 import { getState, useApp } from '@/store/store';
 import { color, font, radius, space } from '@/theme/tokens';
 
@@ -38,7 +38,7 @@ export default function Assistant() {
       const r = await callAi<{ text: string }>(ai, { kind: 'chat', messages: next, context: coachContext(getState(), today()) });
       setMsgs([...next, { role: 'assistant', text: String(r.text ?? '').trim() }]);
     } catch (e) {
-      setErr(AI_ERRORS[(e as AiError).code] ?? AI_ERRORS.unknown);
+      setErr(aiErrorText(e));
     } finally {
       setBusy(false);
       setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 50);

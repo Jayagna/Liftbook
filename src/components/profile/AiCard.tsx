@@ -7,8 +7,8 @@ import { Card, CardHeader } from '@/components/ui/Card';
 import { Field } from '@/components/ui/Field';
 import { Pill } from '@/components/ui/Pill';
 import { T } from '@/components/ui/T';
-import { AI_ERRORS, aiReady, type AiConfig } from '@/domain/ai';
-import { AiError, callAi } from '@/hooks/aiClient';
+import { aiReady, type AiConfig } from '@/domain/ai';
+import { aiErrorText, callAi } from '@/hooks/aiClient';
 import { actions, useApp } from '@/store/store';
 import { color, space } from '@/theme/tokens';
 
@@ -36,7 +36,7 @@ export function AiCard({ index = 0 }: { index?: number }) {
       actions.setAi(cfg);
       setNote({ ok: true, text: 'Connected. The assistant and AI meal estimates are on.' });
     } catch (e) {
-      setNote({ ok: false, text: AI_ERRORS[(e as AiError).code] ?? AI_ERRORS.unknown });
+      setNote({ ok: false, text: aiErrorText(e) });
     } finally { setBusy(false); }
   };
 

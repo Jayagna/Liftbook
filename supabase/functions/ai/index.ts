@@ -4,7 +4,7 @@
 // Nothing is stored or logged here: a request comes in, goes to Gemini, and the answer goes back.
 const KEY = Deno.env.get('GEMINI_API_KEY') ?? '';
 const PASS = Deno.env.get('LIFTBOOK_PASSCODE') ?? '';
-const MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash';
+const MODEL = (Deno.env.get('GEMINI_MODEL') ?? '').trim() || 'gemini-flash-latest';
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
@@ -43,20 +43,35 @@ const MEAL_SCHEMA = {
   required: ['items'],
 };
 
+// If the chosen model is retired or not offered to this key, try current general models before giving up.
+const FALLBACKS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+
 async function gemini(system: string, contents: unknown[], json: boolean) {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: system }] },
-      contents,
-      generationConfig: json ? { responseMimeType: 'application/json', responseSchema: MEAL_SCHEMA, temperature: 0.2 } : { temperature: 0.6, maxOutputTokens: 700 },
-    }),
-  });
-  if (!res.ok) return { error: res.status === 429 ? 'busy' : 'upstream', status: res.status };
-  const data = await res.json();
-  const text = (data?.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? '').join('');
-  return text ? { text } : { error: 'empty', status: 200 };
+  const models = [MODEL, ...FALLBACKS.filter((m) => m !== MODEL)];
+  let last = { error: 'upstream', status: 0, detail: '' };
+  for (const model of models) {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents,
+        generationConfig: json ? { responseMimeType: 'application/json', responseSchema: MEAL_SCHEMA, temperature: 0.2 } : { temperature: 0.6, maxOutputTokens: 700 },
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      // Google's own message, shortened, so the app can say what actually went wrong (it never contains the key).
+      const detail = String(data?.error?.message ?? '').slice(0, 220);
+      last = { error: res.status === 429 ? 'busy' : 'upstream', status: res.status, detail: `${model}: ${res.status} ${detail}`.trim() };
+      if (res.status === 404 || (res.status === 400 && /model/i.test(detail))) continue;
+      return last;
+    }
+    const text = (data?.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? '').join('');
+    const why = data?.candidates?.[0]?.finishReason ?? data?.promptFeedback?.blockReason ?? '';
+    return text ? { text } : { error: 'empty', status: 200, detail: why ? `${model}: ${why}` : '' };
+  }
+  return last;
 }
 
 Deno.serve(async (req) => {
@@ -73,7 +88,7 @@ Deno.serve(async (req) => {
     const text = typeof body.text === 'string' ? body.text.trim().slice(0, 600) : '';
     if (!text) return reply(400, { error: 'bad-request' });
     const r = await gemini(MEAL, [{ role: 'user', parts: [{ text }] }], true);
-    if ('error' in r) return reply(502, { error: r.error });
+    if ('error' in r) return reply(502, { error: r.error, detail: r.detail });
     try { return reply(200, { estimate: JSON.parse(r.text) }); } catch { return reply(502, { error: 'empty' }); }
   }
 
@@ -85,7 +100,7 @@ Deno.serve(async (req) => {
     if (!contents.length || contents[contents.length - 1].role !== 'user') return reply(400, { error: 'bad-request' });
     const summary = typeof body.context === 'string' ? body.context.slice(0, 4000) : '';
     const r = await gemini(`${COACH}\n\nSummary of the user's own data from the app:\n${summary || '(none shared)'}`, contents, false);
-    if ('error' in r) return reply(502, { error: r.error });
+    if ('error' in r) return reply(502, { error: r.error, detail: r.detail });
     return reply(200, { text: r.text });
   }
   return reply(400, { error: 'bad-request' });

@@ -1,7 +1,14 @@
 // The only place the app talks to the AI function. It sends what the caller passes and nothing else.
-import { aiEndpoint, type AiConfig } from '@/domain/ai';
+import { AI_ERRORS, aiEndpoint, type AiConfig } from '@/domain/ai';
 
-export class AiError extends Error { constructor(public code: string) { super(code); } }
+export class AiError extends Error { constructor(public code: string, public detail = '') { super(code); } }
+
+/** Friendly message for an AI failure, with Gemini's own reason added when the server passed one on. */
+export function aiErrorText(e: unknown): string {
+  const err = e as AiError;
+  const base = AI_ERRORS[err?.code] ?? AI_ERRORS.unknown;
+  return err?.detail ? `${base} (${err.detail})` : base;
+}
 
 export async function callAi<T>(config: AiConfig, body: Record<string, unknown>): Promise<T> {
   let res: Response;
@@ -18,7 +25,7 @@ export async function callAi<T>(config: AiConfig, body: Record<string, unknown>)
   } finally {
     clearTimeout(timer);
   }
-  const data = await res.json().catch(() => null) as ({ error?: string } & T) | null;
-  if (!res.ok || !data) throw new AiError(typeof data?.error === 'string' ? data.error : 'unknown');
+  const data = await res.json().catch(() => null) as ({ error?: string; detail?: string } & T) | null;
+  if (!res.ok || !data) throw new AiError(typeof data?.error === 'string' ? data.error : 'unknown', typeof data?.detail === 'string' ? data.detail : '');
   return data;
 }

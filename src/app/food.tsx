@@ -17,8 +17,8 @@ import type { FoodDef } from '@/domain/foods';
 import { knownFoods, macroKcal, parseMealText, recentFoods, scale, searchFoods, slotForHour, slotLabel, SLOTS, toMeal, type ParsedItem } from '@/domain/meals';
 import type { MealSlot } from '@/domain/types';
 import { haptic } from '@/hooks/haptics';
-import { AI_ERRORS, aiReady, readEstimate, type EstimateItem } from '@/domain/ai';
-import { AiError, callAi } from '@/hooks/aiClient';
+import { aiReady, readEstimate, type EstimateItem } from '@/domain/ai';
+import { aiErrorText, callAi } from '@/hooks/aiClient';
 import { actions, useApp } from '@/store/store';
 import { color, font, radius, space } from '@/theme/tokens';
 
@@ -274,7 +274,7 @@ function AiEstimate({ text, slot, onAddAi }: { text: string; slot: MealSlot; onA
     try {
       const r = await callAi<{ estimate: unknown }>(ai, { kind: 'meal', text });
       setRes({ for: text, ...readEstimate(r.estimate) });
-    } catch (e) { setErr(AI_ERRORS[(e as AiError).code] ?? AI_ERRORS.unknown); } finally { setBusy(false); }
+    } catch (e) { setErr(aiErrorText(e)); } finally { setBusy(false); }
   };
   const shown = res && res.for === text ? res : null;
   const total = (shown?.items ?? []).reduce((a, x) => a + x.kcal, 0);
