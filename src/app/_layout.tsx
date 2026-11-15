@@ -23,7 +23,8 @@ if (Platform.OS === 'web' && typeof document !== 'undefined' && !document.getEle
   const el = document.createElement('style');
   el.id = 'lb-inputs';
   el.textContent = [
-    'input,textarea{outline:none}',
+    // 16px text in fields stops iPhone Safari from zooming in when a field is tapped.
+    'input,textarea{outline:none;font-size:max(16px,1em)!important}',
     // Keyboard focus is always visible; pointer hover gives a quiet lift on anything pressable.
     '[role=button]:focus-visible,[role=tab]:focus-visible,[role=link]:focus-visible{outline:2px solid #C8FF50;outline-offset:2px}',
     '[role=button],[role=tab],[role=link]{transition:filter .16s ease}',

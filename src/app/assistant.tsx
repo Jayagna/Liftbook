@@ -103,6 +103,6 @@ const styles = StyleSheet.create({
   theirs: { alignSelf: 'flex-start', backgroundColor: color.card, borderBottomLeftRadius: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: color.lineStrong },
   msg: { fontFamily: font.body, fontSize: 15, lineHeight: 21, color: color.text },
   bar: { flexDirection: 'row', alignItems: 'flex-end', gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: color.line, backgroundColor: color.bg },
-  input: { flex: 1, minHeight: 46, maxHeight: 120, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 23, backgroundColor: color.bg2, color: color.text, fontFamily: font.body, fontSize: 15 },
+  input: { flex: 1, minHeight: 46, maxHeight: 120, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 23, backgroundColor: color.bg2, color: color.text, fontFamily: font.body, fontSize: 16 },
   send: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: color.lime },
 });

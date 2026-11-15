@@ -413,7 +413,7 @@ function NewFood({ initialName, slot, mine, onSaved }: { initialName: string; sl
 const styles = StyleSheet.create({
   quickAi: { borderColor: 'rgba(200,255,80,0.3)' },
   quickRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  quickInput: { flex: 1, minWidth: 0, height: 48, paddingHorizontal: 14, borderRadius: radius.md, backgroundColor: color.bg2, color: color.text, fontFamily: font.bodyMed, fontSize: 15, borderWidth: StyleSheet.hairlineWidth, borderColor: color.lineStrong },
+  quickInput: { flex: 1, minWidth: 0, height: 48, paddingHorizontal: 14, borderRadius: radius.md, backgroundColor: color.bg2, color: color.text, fontFamily: font.bodyMed, fontSize: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: color.lineStrong },
   quickGo: { width: 48, height: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: color.lime },
   root: { flex: 1, backgroundColor: color.bg },
   top: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingBottom: space.md },

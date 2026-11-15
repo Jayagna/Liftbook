@@ -72,12 +72,24 @@ function flagStorage(failed: boolean) {
   listeners.forEach((l) => l());
 }
 
+function writeNow() {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  const { hydrated, storageError, ...rest } = state;
+  AsyncStorage.setItem(KEY, JSON.stringify(rest)).then(() => flagStorage(false)).catch(() => flagStorage(true));
+}
+
 function persist() {
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    const { hydrated, storageError, ...rest } = state;
-    AsyncStorage.setItem(KEY, JSON.stringify(rest)).then(() => flagStorage(false)).catch(() => flagStorage(true));
-  }, 250);
+  saveTimer = setTimeout(writeNow, 250);
+}
+
+// Web: if the page is reloaded, closed or sent to the background before the short save delay ends,
+// write straight away so nothing logged in the last moment is lost.
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && typeof window.addEventListener === 'function') {
+  const flush = () => { if (saveTimer && state.hydrated) writeNow(); };
+  window.addEventListener('pagehide', flush);
+  window.addEventListener('beforeunload', flush);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
 }
 
 function set(next: AppState | ((s: AppState) => AppState)) {

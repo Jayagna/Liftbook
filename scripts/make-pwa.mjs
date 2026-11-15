@@ -35,7 +35,7 @@ if (!viewport.test(html) || !html.includes('</head>')) {
   process.exit(1);
 }
 // viewport-fit=cover lets the app draw under the notch and home bar, where it already leaves safe-area padding.
-html = html.replace(viewport, '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, shrink-to-fit=no" />');
+html = html.replace(viewport, '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, shrink-to-fit=no" />');
 const head = `
     <link rel="manifest" href="${base}/manifest.webmanifest" />
     <meta name="theme-color" content="#0D1010" />
@@ -44,7 +44,7 @@ const head = `
     <meta name="apple-mobile-web-app-title" content="Liftbook" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="apple-touch-icon" href="${base}/icons/apple-touch-icon.png" />
-    <style>html,body{background:#0D1010}</style>
+    <style>html,body{background:#0A0C0B;overscroll-behavior:none;-webkit-text-size-adjust:100%;touch-action:manipulation}</style>
     <script>
       if ('serviceWorker' in navigator) {
         addEventListener('load', function () {
