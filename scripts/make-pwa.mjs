@@ -48,7 +48,14 @@ const head = `
     <script>
       if ('serviceWorker' in navigator) {
         addEventListener('load', function () {
-          navigator.serviceWorker.register('${base}/sw.js', { scope: '${base}/' }).catch(function () {});
+          navigator.serviceWorker.register('${base}/sw.js', { scope: '${base}/', updateViaCache: 'none' })
+            .then(function (r) { r.update().catch(function () {}); }).catch(function () {});
+        });
+        // When a newer version has just taken over, reload once so the screen shows it. Logged data is kept.
+        var hadController = !!navigator.serviceWorker.controller, reloaded = false;
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          if (!hadController || reloaded) return;
+          reloaded = true; location.reload();
         });
       }
       // Asks the browser not to clear this site's storage when the phone runs low on space.

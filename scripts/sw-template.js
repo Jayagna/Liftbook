@@ -9,11 +9,12 @@ const SHELL = `${BASE}/index.html`;
 
 self.addEventListener('install', (event) => {
   // Every file of this version is stored before it counts as installed, so offline never gets half an app.
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES.map((f) => new Request(`${BASE}/${f}`, { cache: 'reload' })))));
+  // A new version takes over as soon as it is fully stored; the page then reloads once into it.
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES.map((f) => new Request(`${BASE}/${f}`, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
-  // A new version takes over only once the old one is no longer open, then clears the old files.
+  // Clears the previous version's files once this one is in charge.
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(keys.filter((k) => k.startsWith('liftbook-') && k !== CACHE).map((k) => caches.delete(k))))
@@ -33,9 +34,10 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin || !url.pathname.startsWith(`${BASE}/`)) return;
 
   if (req.mode === 'navigate') {
-    // Opening the app: try the network briefly so updates arrive, then fall back to the stored copy.
+    // Opening the app: ask the server directly (skipping the browser's own short-term cache) so updates arrive,
+    // then fall back to the stored copy when offline or slow.
     event.respondWith(
-      withTimeout(fetch(req), 2500)
+      withTimeout(fetch(req.url, { cache: 'no-store', credentials: 'same-origin' }), 2500)
         .then((res) => (res.ok ? res : caches.match(SHELL).then((hit) => hit || res)))
         .catch(() => caches.match(SHELL).then((hit) => hit || Response.error())),
     );
