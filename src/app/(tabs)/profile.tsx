@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
+import { AiCard } from '@/components/profile/AiCard';
 import { DataCard } from '@/components/profile/DataCard';
 import { InstallCard } from '@/components/profile/InstallCard';
 import { SampleBanner } from '@/components/SampleBanner';
@@ -146,8 +147,9 @@ export default function ProfileScreen() {
         </Card>
       )}
 
-      <DataCard index={4} />
-      <InstallCard index={5} />
+      <AiCard index={4} />
+      <DataCard index={5} />
+      <InstallCard index={6} />
     </Screen>
   );
 }

@@ -17,6 +17,8 @@ import type { FoodDef } from '@/domain/foods';
 import { knownFoods, macroKcal, parseMealText, recentFoods, scale, searchFoods, slotForHour, slotLabel, SLOTS, toMeal, type ParsedItem } from '@/domain/meals';
 import type { MealSlot } from '@/domain/types';
 import { haptic } from '@/hooks/haptics';
+import { AI_ERRORS, aiReady, readEstimate, type EstimateItem } from '@/domain/ai';
+import { AiError, callAi } from '@/hooks/aiClient';
 import { actions, useApp } from '@/store/store';
 import { color, font, radius, space } from '@/theme/tokens';
 
@@ -153,7 +155,7 @@ export default function AddFood() {
           </>
         )}
 
-        {tab === 'describe' && <Describe foods={foods} slot={slot} onAdd={(items) => { actions.addMeals(items.map((x) => ({ ...toMeal(x.food!, x.qty), slot })), date); note(items.length, items.reduce((a, x) => a + scale(x.food!, x.qty).kcal, 0)); }} onSearch={(text) => { setQ(text); setTab('foods'); }} />}
+        {tab === 'describe' && <Describe foods={foods} slot={slot} onAddAi={(items) => { actions.addMeals(items.map((x) => ({ name: x.name, qty: 1, kcal: x.kcal, p: x.p, c: x.c, f: x.f, source: 'ai' as const, slot })), date); note(items.length, items.reduce((a, x) => a + x.kcal, 0)); }} onAdd={(items) => { actions.addMeals(items.map((x) => ({ ...toMeal(x.food!, x.qty), slot })), date); note(items.length, items.reduce((a, x) => a + scale(x.food!, x.qty).kcal, 0)); }} onSearch={(text) => { setQ(text); setTab('foods'); }} />}
 
         {tab === 'new' && <NewFood initialName={q.trim()} slot={slot} mine={customFoods} onSaved={(f, log) => { actions.addCustomFood(f); if (log) addFood({ ...f, custom: true }, 1); else haptic.success(); }} />}
       </ScrollView>
@@ -203,7 +205,7 @@ function FoodRow({ f, first, open, onToggle, onAdd, slot }: { f: FoodDef; first:
   );
 }
 
-function Describe({ foods, slot, onAdd, onSearch }: { foods: FoodDef[]; slot: MealSlot; onAdd: (items: ParsedItem[]) => void; onSearch: (text: string) => void }) {
+function Describe({ foods, slot, onAdd, onAddAi, onSearch }: { foods: FoodDef[]; slot: MealSlot; onAdd: (items: ParsedItem[]) => void; onAddAi: (items: EstimateItem[]) => void; onSearch: (text: string) => void }) {
   const [text, setText] = useState('');
   const [items, setItems] = useState<ParsedItem[] | null>(null);
   const matched = (items ?? []).filter((x) => x.food);
@@ -254,7 +256,54 @@ function Describe({ foods, slot, onAdd, onSearch }: { foods: FoodDef[]; slot: Me
       )}
 
       {items && items.length === 0 && <T v="small">Type what you ate first, for example “oats with milk and a banana”.</T>}
+      <AiEstimate text={text} slot={slot} onAddAi={onAddAi} />
     </>
+  );
+}
+
+/** AI estimate for a described meal. Shown as an estimate, editable by removing items, and saved only on a tap. */
+function AiEstimate({ text, slot, onAddAi }: { text: string; slot: MealSlot; onAddAi: (items: EstimateItem[]) => void }) {
+  const ai = useApp((s) => s.ai);
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState<{ for: string; items: EstimateItem[]; note: string } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  if (!aiReady(ai)) return <T v="small" style={{ color: color.text3 }}>For foods that are not in the list, connect the AI assistant in Profile to get an estimate.</T>;
+  const ask = async () => {
+    if (!text.trim() || busy) return;
+    setBusy(true); setErr(null); setRes(null);
+    try {
+      const r = await callAi<{ estimate: unknown }>(ai, { kind: 'meal', text });
+      setRes({ for: text, ...readEstimate(r.estimate) });
+    } catch (e) { setErr(AI_ERRORS[(e as AiError).code] ?? AI_ERRORS.unknown); } finally { setBusy(false); }
+  };
+  const shown = res && res.for === text ? res : null;
+  const total = (shown?.items ?? []).reduce((a, x) => a + x.kcal, 0);
+  return (
+    <View style={styles.card}>
+      <T v="label">Or ask the AI</T>
+      <T v="small">Sends only the words you typed above to Gemini. You see the estimate before anything is saved.</T>
+      <Pill label={busy ? 'Estimating…' : 'Estimate with AI'} onPress={ask} style={{ alignSelf: 'flex-start', opacity: text.trim() ? 1 : 0.4 }} />
+      {err && <T v="small" style={{ color: color.warn }} accessibilityRole="alert">{err}</T>}
+      {shown && shown.items.length === 0 && <T v="small" style={{ color: color.warn }}>{shown.note || 'The AI could not estimate that. Try naming the foods and amounts.'}</T>}
+      {shown && shown.items.length > 0 && (
+        <View style={[styles.card, styles.warnCard]}>
+          <T v="label" style={{ color: color.warn }}>AI estimate · not verified</T>
+          {shown.items.map((x, i) => (
+            <View key={i} style={styles.between}>
+              <View style={{ flex: 1 }}>
+                <T v="bodyMed" numberOfLines={2}>{x.name}</T>
+                <T v="small">{x.assumed ? `${x.assumed} · ` : ''}{x.kcal} kcal · P {x.p} · C {x.c} · F {x.f}{x.confidence === 'low' ? ' · rough guess' : ''}</T>
+              </View>
+              <PressableScale style={styles.iconBtn} onPress={() => setRes({ ...shown, items: shown.items.filter((_, k) => k !== i) })} accessibilityLabel={`Remove ${x.name}`}>
+                <Ionicons name="close" size={16} color={color.text3} />
+              </PressableScale>
+            </View>
+          ))}
+          {shown.note ? <T v="small">{shown.note}</T> : null}
+          <Pill solid label={`Add estimate to ${slotLabel(slot).toLowerCase()} · ${Math.round(total)} kcal`} onPress={() => { onAddAi(shown.items); setRes(null); }} />
+        </View>
+      )}
+    </View>
   );
 }
 
