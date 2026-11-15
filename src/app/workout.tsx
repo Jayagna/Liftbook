@@ -21,6 +21,7 @@ import { Stepper } from '@/components/ui/Stepper';
 import { T } from '@/components/ui/T';
 import { longDate, shortDate } from '@/domain/dates';
 import { findExercise, MUSCLE_LABEL } from '@/domain/exercises';
+import { FormLink } from '@/components/train/FormLink';
 import { plannedFrom } from '@/domain/planner';
 import { bestEver, e1rm, fmtKg, isPR, suggest } from '@/domain/progression';
 import { elapsedSec, fmtClock, nextInBlock, nextUp, prefill, restBefore, summarize, type Summary } from '@/domain/session';
@@ -208,7 +209,10 @@ export default function Workout() {
                 {setNo > cur.sets ? `Extra set ${setNo}` : `Set ${setNo} of ${cur.sets}`} · {cur.repLow}–{cur.repHigh}{timed ? ' s' : ' reps'}
               </T>
             </View>
-            <T v="title" style={styles.curName}>{cur.name}</T>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+              <T v="title" style={[styles.curName, { flex: 1 }]}>{cur.name}</T>
+              <FormLink name={cur.name} />
+            </View>
             {(def || partnerNames.length > 0) && (
               <View style={styles.tags}>
                 {partnerNames.length > 0 && (

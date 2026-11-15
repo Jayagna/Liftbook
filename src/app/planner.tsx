@@ -13,6 +13,7 @@ import { Stepper } from '@/components/ui/Stepper';
 import { T } from '@/components/ui/T';
 import { DOW_LONG, DOW_SHORT } from '@/domain/dates';
 import { findExercise, MUSCLE_LABEL } from '@/domain/exercises';
+import { FormLink } from '@/components/train/FormLink';
 import {
   dayName, FOCUS_LABEL, inferFocus, moveDay, moveExercise, plannedFrom, prefsFromPlan, rebuildDay, recoveryConflicts,
   regeneratePlan, toggleSuperset,
@@ -251,6 +252,7 @@ export default function Planner() {
                           {e.sets} × {e.repLow}–{e.repHigh}{timed ? ' s' : ''} · rest {restLabel(e.restSec)}{e.targetKg ? ` · ${fmtKg(e.targetKg)} kg` : ''}{def ? ` · ${def.primary.map((m) => MUSCLE_LABEL[m]).join(', ')}` : ''}
                         </T>
                       </View>
+                      <FormLink name={e.name} />
                       {e.locked && <Ionicons name="lock-closed" size={15} color={color.lime} />}
                       <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color={color.text3} />
                     </PressableScale>

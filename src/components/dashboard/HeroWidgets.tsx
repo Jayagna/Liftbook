@@ -1,12 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Body3D, type MuscleTone } from '@/components/three/Body3D';
+import { RenderBody } from './RenderBody';
 import { Rings3D } from '@/components/three/Rings3D';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { CountUp } from '@/components/ui/CountUp';
 import { Choice } from '@/components/ui/Field';
 import { Ring } from '@/components/ui/Ring';
+import { Bar } from '@/components/ui/Bar';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { T } from '@/components/ui/T';
 import { EXERCISES, findExercise, MUSCLE_LABEL } from '@/domain/exercises';
 import { recoveryStatus } from '@/domain/recovery';
@@ -76,15 +78,14 @@ export function TodayRingsWidget({ s, index }: { s: Summary; index: number }) {
 const STATUS = (r: number) => (r >= 0.9 ? color.ok : r >= 0.5 ? color.warn : color.danger);
 
 export function MuscleMapWidget({ s, index }: { s: Summary; index: number }) {
-  const use3d = useApp((st) => st.dashboard.visuals3d);
   const days = useApp((st) => st.days);
   const [mode, setMode] = useState<'today' | 'recovery'>(s.workout ? 'today' : 'recovery');
-  const [view, setView] = useState<'front' | 'back'>('front');
   const [sel, setSel] = useState<MuscleGroup | null>(null);
+  const [allRec, setAllRec] = useState(false);
   const recovery = useMemo(() => recoveryStatus(days), [days]);
 
   const { tone, primary, secondary } = useMemo(() => {
-    const t: MuscleTone = {};
+    const t: Partial<Record<MuscleGroup, string>> = {};
     const prim = new Set<MuscleGroup>(), sec = new Set<MuscleGroup>();
     if (mode === 'today' && s.workout) {
       for (const e of s.workout.exercises) {
@@ -92,7 +93,7 @@ export function MuscleMapWidget({ s, index }: { s: Summary; index: number }) {
         ex?.primary.forEach((m) => prim.add(m));
         ex?.secondary.forEach((m) => sec.add(m));
       }
-      sec.forEach((m) => { if (!prim.has(m)) t[m] = '#5E7A2A'; });
+      sec.forEach((m) => { if (!prim.has(m)) t[m] = '#4FB3FF'; });
       prim.forEach((m) => (t[m] = color.lime));
     } else if (mode === 'recovery') {
       for (const r of recovery) t[r.muscle] = STATUS(r.recovered);
@@ -102,30 +103,28 @@ export function MuscleMapWidget({ s, index }: { s: Summary; index: number }) {
 
   const selInfo = sel ? recovery.find((r) => r.muscle === sel) : null;
   const selExercises = sel ? EXERCISES.filter((e) => e.primary.includes(sel)).slice(0, 4) : [];
-  const select = (m: MuscleGroup | null) => { haptic.select(); setSel(m); if (m) { const front: MuscleGroup[] = ['chest', 'abs', 'obliques', 'quads', 'biceps']; const back: MuscleGroup[] = ['back', 'lats', 'traps', 'glutes', 'hamstrings', 'calves', 'rear_delts', 'triceps']; if (front.includes(m)) setView('front'); else if (back.includes(m)) setView('back'); } };
+  const select = (m: MuscleGroup | null) => { haptic.select(); setSel(m); };
 
   return (
     <Card index={index} padded={false}>
       <View style={{ padding: space.lg, paddingBottom: 0 }}>
-        <CardHeader title="Muscle map" right={<T v="small">{use3d ? 'Drag to rotate · tap a muscle' : 'Tap a muscle below'}</T>} />
+        <CardHeader title="Muscle map" right={<T v="small">Tap a muscle</T>} />
         <Choice value={mode} onChange={(v) => { setMode(v); setSel(null); }} options={[{ value: 'today', label: s.workout ? `Today · ${s.workout.name}` : 'Today' }, { value: 'recovery', label: 'Recovery' }]} />
       </View>
-      {use3d ? (
-        <View>
-          <Body3D tone={tone} selected={sel} onSelect={select} view={view} height={340} />
-          <View style={styles.viewToggle}>
-            {(['front', 'back'] as const).map((v) => (
-              <T key={v} onPress={() => { haptic.select(); setView(v); }} style={[styles.viewBtn, view === v && styles.viewBtnOn]}>{v === 'front' ? 'Front' : 'Back'}</T>
-            ))}
+      <View style={styles.bodies}>
+        {(['front', 'back'] as const).map((side) => (
+          <View key={side} style={{ alignItems: 'center' }}>
+            <RenderBody side={side} tone={tone} selected={sel} onSelect={(m) => select(sel === m ? null : m)} height={262} />
+            <T v="label" style={{ marginTop: 4 }}>{side === 'front' ? 'Front' : 'Back'}</T>
           </View>
-        </View>
-      ) : null}
-      <View style={{ padding: space.lg, paddingTop: use3d ? 0 : space.md, gap: space.md }}>
+        ))}
+      </View>
+      <View style={{ padding: space.lg, paddingTop: space.sm, gap: space.md }}>
         <View style={styles.legendRow}>
           {mode === 'today' ? (
             <>
               <Key c={color.lime} label="Primary" />
-              <Key c="#5E7A2A" label="Secondary" />
+              <Key c="#4FB3FF" label="Secondary" />
             </>
           ) : (
             <>
@@ -137,8 +136,21 @@ export function MuscleMapWidget({ s, index }: { s: Summary; index: number }) {
         </View>
         {mode === 'today' && !s.workout && <T v="small">Rest day. Switch to Recovery to see how your muscles are bouncing back.</T>}
         {mode === 'recovery' && recovery.length === 0 && <T v="small">Log a workout and estimated recovery shows up on the body.</T>}
+        {mode === 'recovery' && recovery.length > 0 && (
+          <View style={{ gap: 10 }}>
+            {[...recovery].sort((a, b) => a.recovered - b.recovered).slice(0, allRec ? undefined : 5).map((r, i) => (
+              <PressableScale key={r.muscle} haptics={false} scaleTo={0.98} onPress={() => select(sel === r.muscle ? null : r.muscle)} style={[styles.recRow, sel === r.muscle && styles.recRowOn]}
+                accessibilityLabel={`${MUSCLE_LABEL[r.muscle]}, ${Math.round(r.recovered * 100)} percent recovered, estimate`}>
+                <T v="bodyMed" style={{ width: 92 }} numberOfLines={1}>{MUSCLE_LABEL[r.muscle]}</T>
+                <View style={{ flex: 1 }}><Bar progress={r.recovered} tint={STATUS(r.recovered)} height={6} delay={150 + i * 70} /></View>
+                <T style={[styles.recPct, { color: STATUS(r.recovered) }]}>{Math.round(r.recovered * 100)}%</T>
+              </PressableScale>
+            ))}
+            {recovery.length > 5 && <T v="small" onPress={() => setAllRec(!allRec)} accessibilityRole="button" style={{ color: color.lime, paddingHorizontal: 6 }}>{allRec ? 'Show less' : `Show all ${recovery.length} muscles`}</T>}
+          </View>
+        )}
         <View style={styles.chips}>
-          {(mode === 'today' ? [...primary] : recovery.map((r) => r.muscle)).map((m) => (
+          {(mode === 'today' ? [...primary] : []).map((m) => (
             <T key={m} onPress={() => select(sel === m ? null : m)} style={[styles.chip, sel === m && styles.chipOn]}>{MUSCLE_LABEL[m]}</T>
           ))}
         </View>
@@ -187,6 +199,10 @@ const styles = StyleSheet.create({
   legendPct: { fontFamily: font.display, fontSize: 26, color: color.text },
   dot: { width: 8, height: 8, borderRadius: 4 },
   bonus: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: space.lg, paddingBottom: space.lg, marginTop: -space.sm },
+  recRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: 4, paddingHorizontal: 6, borderRadius: radius.sm },
+  recRowOn: { backgroundColor: 'rgba(255,255,255,0.06)' },
+  recPct: { fontFamily: font.display, fontSize: 18, width: 44, textAlign: 'right' },
+  bodies: { flexDirection: 'row', justifyContent: 'center', gap: 0, paddingTop: space.md, backgroundColor: '#000', marginTop: space.md },
   viewToggle: { position: 'absolute', right: space.lg, bottom: space.lg, flexDirection: 'row', backgroundColor: 'rgba(13,16,16,0.7)', borderRadius: radius.pill, padding: 3 },
   viewBtn: { fontFamily: font.bodySemi, fontSize: 12, color: color.text2, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, overflow: 'hidden' },
   viewBtnOn: { backgroundColor: color.text, color: color.bg },

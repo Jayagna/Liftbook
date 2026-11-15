@@ -8,6 +8,7 @@ import { Aurora } from '@/components/ui/Aurora';
 import { Pill } from '@/components/ui/Pill';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { T } from '@/components/ui/T';
+import { FormLink } from '@/components/train/FormLink';
 import { allExercises, EQUIPMENT_LABEL, MUSCLE_LABEL, type Equipment } from '@/domain/exercises';
 import type { MuscleGroup } from '@/domain/types';
 import { useApp } from '@/store/store';
@@ -83,9 +84,9 @@ export default function Exercises() {
               <PressableScale key={e.name} scaleTo={0.99} style={[styles.row, i > 0 && styles.line]} onPress={() => router.push({ pathname: '/exercise', params: { name: e.name } })} accessibilityLabel={`${e.name}, open`}>
                 <View style={{ flex: 1 }}>
                   <T v="bodyMed" style={{ fontSize: 16 }} numberOfLines={1}>{e.name}{e.custom ? '  ·  yours' : ''}</T>
-                  <T v="small" numberOfLines={1}>{e.primary.map((m) => MUSCLE_LABEL[m]).join(', ')} · {e.equipment.map((k) => EQUIPMENT_LABEL[k]).join(' / ')}</T>
+                  <T v="small" numberOfLines={1}>{e.primary.map((m) => MUSCLE_LABEL[m]).join(', ')} · {e.equipment.map((k) => EQUIPMENT_LABEL[k]).join(' / ')}{e.compound ? ' · compound' : ''}</T>
                 </View>
-                {e.compound && <View style={styles.tag}><T style={styles.tagText}>Compound</T></View>}
+                <FormLink name={e.name} />
                 <Ionicons name="chevron-forward" size={16} color={color.text3} />
               </PressableScale>
             ))}

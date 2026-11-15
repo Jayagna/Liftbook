@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Choice, Field } from '@/components/ui/Field';
 import { Pill } from '@/components/ui/Pill';
 import { PressableScale } from '@/components/ui/PressableScale';
+import { FormLink } from './FormLink';
 import { T } from '@/components/ui/T';
 import { allExercises, EQUIPMENT_LABEL, MUSCLE_LABEL, type Equipment, type ExerciseDef } from '@/domain/exercises';
 import { alternatives, prefsFromPlan } from '@/domain/planner';
@@ -68,6 +69,7 @@ export function ExercisePicker({ visible, onClose, onPick, replaceFor, exclude =
         <T v="bodyMed">{e.name}</T>
         <T v="small">{e.primary.map((m) => MUSCLE_LABEL[m]).join(', ')} · {e.equipment.map((x) => EQUIPMENT_LABEL[x]).join(' / ')}{e.custom ? ' · yours' : ''}</T>
       </View>
+      <FormLink name={e.name} />
       {tag ? <View style={styles.tag}><T style={styles.tagText}>{tag}</T></View> : null}
       <Ionicons name="add-circle" size={24} color={color.lime} />
     </PressableScale>

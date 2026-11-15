@@ -4,7 +4,8 @@ import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition, useReducedMotion } from 'react-native-reanimated';
 import { SampleBanner } from '@/components/SampleBanner';
-import { Body3D, type MuscleTone } from '@/components/three/Body3D';
+import { RenderBody } from '@/components/dashboard/RenderBody';
+import { FormLink } from '@/components/train/FormLink';
 import { Card } from '@/components/ui/Card';
 import { Pill } from '@/components/ui/Pill';
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -28,7 +29,6 @@ export default function Train() {
   const ws = weekStart(t);
   const week = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
   const workout = plannedWorkout(getState(), date);
-  const use3d = useApp((s) => s.dashboard.visuals3d);
   const session = useApp((s) => s.session);
   const hasProfile = useApp((s) => !!s.profile);
   const day = days[date];
@@ -107,9 +107,9 @@ export default function Train() {
               Finished in {fmtClock(day.workout.durationSec)}
             </T>
           )}
-          {use3d && planned.length > 0 && <DayBody names={planned.map((e) => e.name)} />}
+          {planned.length > 0 && <DayBody names={planned.map((e) => e.name)} />}
           {isToday && !session && (
-            <View style={{ padding: 16, paddingTop: use3d && planned.length > 0 ? 0 : 14 }}>
+            <View style={{ padding: 16, paddingTop: planned.length > 0 ? 0 : 14 }}>
               <PressableScale style={styles.cta} onPress={start} accessibilityLabel="Start workout with rest timer">
                 <Ionicons name="play" size={18} color={color.limeInk} />
                 <T style={styles.ctaText}>{day?.workout ? 'Train again' : (day?.sets.length ?? 0) > 0 ? 'Continue workout' : 'Start workout'}</T>
@@ -134,22 +134,20 @@ export default function Train() {
 
 function DayBody({ names }: { names: string[] }) {
   const [sel, setSel] = useState<MuscleGroup | null>(null);
-  const [view, setView] = useState<'front' | 'back'>('front');
   const tone = useMemo(() => {
-    const t: MuscleTone = {};
+    const t: Partial<Record<MuscleGroup, string>> = {};
     const prim = new Set<MuscleGroup>();
     for (const n of names) findExercise(n)?.primary.forEach((m) => prim.add(m));
-    for (const n of names) findExercise(n)?.secondary.forEach((m) => { if (!prim.has(m)) t[m] = '#5E7A2A'; });
+    for (const n of names) findExercise(n)?.secondary.forEach((m) => { if (!prim.has(m)) t[m] = '#4FB3FF'; });
     prim.forEach((m) => (t[m] = color.lime));
     return t;
   }, [names.join('|')]);
   return (
-    <View>
-      <Body3D tone={tone} selected={sel} onSelect={setSel} view={view} height={280} />
-      <View style={{ position: 'absolute', right: 12, bottom: 12, flexDirection: 'row', gap: 6 }}>
-        <Pill small label={view === 'front' ? 'Show back' : 'Show front'} onPress={() => setView(view === 'front' ? 'back' : 'front')} />
+    <View style={{ alignItems: 'center', paddingVertical: space.md, backgroundColor: '#000', marginTop: space.md }}>
+      <View style={{ flexDirection: 'row' }}>
+        {(['front', 'back'] as const).map((side) => <RenderBody key={side} side={side} tone={tone} selected={sel} onSelect={(m) => setSel(sel === m ? null : m)} height={250} />)}
       </View>
-      {sel && <T v="small" style={{ position: 'absolute', left: 16, bottom: 18, color: color.text }}>{MUSCLE_LABEL[sel]}</T>}
+      <T v="small" style={{ marginTop: 6, color: sel ? color.text : color.text3 }}>{sel ? MUSCLE_LABEL[sel] : 'Lime: main muscles today · blue: also working'}</T>
     </View>
   );
 }
@@ -198,6 +196,7 @@ function ExerciseCard({ e, date, startOpen }: { e: PlannedExercise; date: string
             <T v="bodyMed" style={{ fontSize: 16 }}>{e.name}</T>
             <T v="small">{e.sets} × {e.repLow}–{e.repHigh}{timed ? ' s' : ''} · rest {Math.round(e.restSec / 15) * 15 >= 60 ? `${Math.round(e.restSec / 30) / 2} min` : `${e.restSec} s`}{ex ? ` · ${ex.primary.map((m) => MUSCLE_LABEL[m]).join(', ')}` : ''}</T>
           </View>
+          <FormLink name={e.name} />
           <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={color.text3} />
         </PressableScale>
         {open && (

@@ -4,7 +4,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Body3D, type MuscleTone } from '@/components/three/Body3D';
+import { RenderBody } from '@/components/dashboard/RenderBody';
+import { FormLink } from '@/components/train/FormLink';
 import { Aurora } from '@/components/ui/Aurora';
 import { LineChart } from '@/components/ui/LineChart';
 import { Pill } from '@/components/ui/Pill';
@@ -20,8 +21,7 @@ import { haptic } from '@/hooks/haptics';
 import { actions, useApp } from '@/store/store';
 import { color, font, radius, space } from '@/theme/tokens';
 
-const BACK_SIDE: MuscleGroup[] = ['back', 'lats', 'traps', 'glutes', 'hamstrings', 'calves', 'rear_delts', 'triceps'];
-const SECONDARY = '#5E7A2A';
+const SECONDARY = '#4FB3FF';
 const LEVEL = { beginner: 'Beginner friendly', intermediate: 'Intermediate', advanced: 'Advanced' };
 const back = () => (router.canGoBack() ? router.back() : router.replace('/exercises'));
 
@@ -32,17 +32,15 @@ export default function Exercise() {
   // Subscribed so a custom exercise resolves after the store loads.
   useApp((s) => s.customExercises);
   const ex = findExercise(name);
-  const use3d = useApp((s) => s.dashboard.visuals3d);
   const days = useApp((s) => s.days);
   const plan = useApp((s) => s.plan);
   const training = useApp((s) => s.training);
   const goal = useApp((s) => s.profile?.goal ?? 'general');
-  const [view, setView] = useState<'front' | 'back'>(() => (ex && BACK_SIDE.includes(ex.primary[0]) ? 'back' : 'front'));
   const [sel, setSel] = useState<MuscleGroup | null>(null);
   const [added, setAdded] = useState<string | null>(null);
 
   const tone = useMemo(() => {
-    const t: MuscleTone = {};
+    const t: Partial<Record<MuscleGroup, string>> = {};
     ex?.secondary.forEach((m) => (t[m] = SECONDARY));
     ex?.primary.forEach((m) => (t[m] = color.lime));
     return t;
@@ -94,19 +92,19 @@ export default function Exercise() {
         </View>
 
         <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
-          {use3d && (
-            <View>
-              <Body3D tone={tone} selected={sel} onSelect={(m) => { setSel(m); if (m) setView(BACK_SIDE.includes(m) ? 'back' : 'front'); }} view={view} height={300} />
-              <View style={styles.viewToggle}>
-                <Pill small label={view === 'front' ? 'Show back' : 'Show front'} onPress={() => setView(view === 'front' ? 'back' : 'front')} />
-              </View>
+          <View style={styles.figure}>
+            <View style={{ flexDirection: 'row' }}>
+              {(['front', 'back'] as const).map((side) => <RenderBody key={side} side={side} tone={tone} selected={sel} onSelect={(m) => setSel(sel === m ? null : m)} height={262} />)}
             </View>
-          )}
+            <View style={styles.figureLabels}><T v="label">Front</T><T v="label">Back</T></View>
+          </View>
           <View style={{ padding: space.lg, gap: space.md }}>
-            <MuscleRow label="Main muscles" tint={color.lime} muscles={ex.primary} sel={sel} onSel={(m) => { setSel(m); setView(BACK_SIDE.includes(m) ? 'back' : 'front'); }} />
-            {ex.secondary.length > 0 && <MuscleRow label="Also working" tint={SECONDARY} muscles={ex.secondary} sel={sel} onSel={(m) => { setSel(m); setView(BACK_SIDE.includes(m) ? 'back' : 'front'); }} />}
+            <MuscleRow label="Main muscles" tint={color.lime} muscles={ex.primary} sel={sel} onSel={(m) => setSel(sel === m ? null : m)} />
+            {ex.secondary.length > 0 && <MuscleRow label="Also working" tint={SECONDARY} muscles={ex.secondary} sel={sel} onSel={(m) => setSel(sel === m ? null : m)} />}
           </View>
         </View>
+
+        <FormLink name={ex.name} big />
 
         {guide ? (
           <>
@@ -241,7 +239,8 @@ const styles = StyleSheet.create({
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tag: { paddingHorizontal: 10, height: 26, justifyContent: 'center', borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.06)' },
   tagText: { fontFamily: font.bodySemi, fontSize: 11.5, color: color.text2 },
-  viewToggle: { position: 'absolute', right: 12, bottom: 8 },
+  figure: { alignItems: 'center', paddingTop: space.md, paddingBottom: space.sm, backgroundColor: '#000' },
+  figureLabels: { flexDirection: 'row', justifyContent: 'space-around', width: 260, marginTop: space.sm },
   swatch: { width: 10, height: 10, borderRadius: 5 },
   step: { flexDirection: 'row', gap: space.md, alignItems: 'flex-start' },
   stepNum: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: color.limeDim },
