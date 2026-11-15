@@ -35,6 +35,10 @@ jobs:
           CI: '1'
           # A project site is served from /<repository-name>, so the app is built for that path.
           LIFTBOOK_BASE_URL: /${{ github.event.repository.name }}
+          # The site owner's AI project. Both are public by design; the passcode in Supabase guards the AI.
+          # Leave them empty to make every user enter their own project.
+          EXPO_PUBLIC_LIFTBOOK_AI_URL: https://nejovrbyjeqpezxeebik.supabase.co
+          EXPO_PUBLIC_LIFTBOOK_AI_KEY: sb_publishable_3xA48TWlV1y_wIuvc-nJaA_yZEzilRa
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
