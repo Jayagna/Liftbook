@@ -44,32 +44,40 @@ const MEAL_SCHEMA = {
 };
 
 // If the chosen model is retired or not offered to this key, try current general models before giving up.
-const FALLBACKS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+// Meal estimates use the lighter, faster models first: a calorie guess does not need deep reasoning.
+const CHAT_MODELS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite'];
+const MEAL_MODELS = ['gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash'];
 
 async function gemini(system: string, contents: unknown[], json: boolean) {
-  const models = [MODEL, ...FALLBACKS.filter((m) => m !== MODEL)];
+  const list = json ? MEAL_MODELS : CHAT_MODELS;
+  const models = [...new Set([...(Deno.env.get('GEMINI_MODEL') ? [MODEL] : []), ...list])];
   let last = { error: 'upstream', status: 0, detail: '' };
   for (const model of models) {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents,
-        generationConfig: json ? { responseMimeType: 'application/json', responseSchema: MEAL_SCHEMA, temperature: 0.2 } : { temperature: 0.6, maxOutputTokens: 700 },
-      }),
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      // Google's own message, shortened, so the app can say what actually went wrong (it never contains the key).
-      const detail = String(data?.error?.message ?? '').slice(0, 220);
-      last = { error: res.status === 429 ? 'busy' : 'upstream', status: res.status, detail: `${model}: ${res.status} ${detail}`.trim() };
-      if (res.status === 404 || (res.status === 400 && /model/i.test(detail))) continue;
-      return last;
+    // Turn off "thinking" so answers come back in a second or two. Some models do not accept this, so retry without it.
+    for (const fast of [true, false]) {
+      const base = json ? { responseMimeType: 'application/json', responseSchema: MEAL_SCHEMA, temperature: 0.2 } : { temperature: 0.6, maxOutputTokens: 700 };
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': KEY },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents,
+          generationConfig: fast ? { ...base, thinkingConfig: { thinkingBudget: 0 } } : base,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        // Google's own message, shortened, so the app can say what actually went wrong (it never contains the key).
+        const detail = String(data?.error?.message ?? '').slice(0, 220);
+        last = { error: res.status === 429 ? 'busy' : 'upstream', status: res.status, detail: `${model}: ${res.status} ${detail}`.trim() };
+        if (fast && res.status === 400 && /think/i.test(detail)) continue;
+        break;
+      }
+      const text = (data?.candidates?.[0]?.content?.parts ?? []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? '').join('');
+      const why = data?.candidates?.[0]?.finishReason ?? data?.promptFeedback?.blockReason ?? '';
+      return text ? { text } : { error: 'empty', status: 200, detail: why ? `${model}: ${why}` : '' };
     }
-    const text = (data?.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? '').join('');
-    const why = data?.candidates?.[0]?.finishReason ?? data?.promptFeedback?.blockReason ?? '';
-    return text ? { text } : { error: 'empty', status: 200, detail: why ? `${model}: ${why}` : '' };
+    if (last.status !== 404 && !(last.status === 400 && /model/i.test(last.detail))) return last;
   }
   return last;
 }
